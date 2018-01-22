@@ -1,0 +1,192 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>DASH Live Streaming</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.3.0/shaka-player.compiled.debug.externs.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/2.3.0/shaka-player.compiled.debug.js"></script>
+    <style>
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      video {
+        width: 100%;
+        height: 100%;
+      }
+
+      .controls {
+        width: 100%;
+        display: flex;
+        flex-direction: row;
+      }
+
+      .play-pause {
+        width: 1rem;
+        height: 1rem;
+      }
+
+      .play {
+
+      }
+
+      .pause {
+
+      }
+
+      .time {
+
+      }
+
+      .progress {
+        position: relative;
+        width: 100%;
+        height: 2px;
+      }
+
+      .bar {
+        width: 0%;
+        height: 2px;
+        background: red;
+      }
+
+      .handler {
+        position: absolute;
+        margin-top: -8px;
+        margin-left: -8px;
+        width: 16px;
+        height: 16px;
+        background: red;
+      }
+    </style>
+  </head>
+  <body>
+    <video autoplay></video>
+    <div class="controls">
+      <div class="play-pause">
+        <div class="play">
+
+        </div>
+        <div class="pause">
+
+        </div>
+      </div>
+      <div class="time">
+        00:00:00 / 00:00:00
+      </div>
+      <div class="progress">
+        <div class="bar">
+
+        </div>
+        <div class="handler">
+
+        </div>
+      </div>
+    </div>
+    <script>
+      const controls = {
+        el: document.querySelector(".controls"),
+        playPause: {
+          el: document.querySelector(".play-pause"),
+          play: {
+            el: document.querySelector(".play")
+          },
+          pause: {
+            el: document.querySelector(".pause")
+          }
+        },
+        time: {
+          el: document.querySelector(".time")
+        },
+        progress: {
+          el: document.querySelector(".progress"),
+          bar: {
+            el: document.querySelector(".bar")
+          },
+          handler: {
+            el: document.querySelector(".handler")
+          }
+        }
+      };
+      // Install built-in polyfills to patch browser incompatibilities.
+      shaka.polyfill.installAll();
+      // Check to see if the browser supports the basic APIs Shaka needs.
+      if (shaka.Player.isBrowserSupported()) {
+        // Everything looks good!
+        const video = document.querySelector("video");
+        const player = new shaka.Player(video);
+
+        function format(time) {
+          const seconds = Math.floor(time) % 60;
+          const minutes = Math.floor(time / 60) % 60;
+          const hours = Math.floor(time / 3600);
+          return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+        }
+
+        player.addEventListener("streaming", () => {
+          console.log(player.getManifest());
+        });
+
+        video.addEventListener("timeupdate", (e) => {
+          const currentTime = e.target.currentTime;
+          const duration = player.getManifest().presentationTimeline.getSegmentAvailabilityEnd();
+          const time = `${format(currentTime)} / ${format(duration)}`;
+          controls.time.el.textContent = time;
+          if (!isDragging) {
+            const progress = (currentTime / duration);
+            controls.progress.bar.el.style.width = `${progress * 100}%`;
+            controls.progress.handler.el.style.left = `${progress * 100}%`;
+          }
+        });
+
+        controls.playPause.el.addEventListener("click", (e) => {
+          if (video.paused) {
+            video.play();
+          } else {
+            video.pause();
+          }
+        });
+
+        let isDragging = false;
+        document.addEventListener("mouseup", (e) => {
+          if (isDragging) {
+            isDragging = false;
+          }
+        });
+
+        document.addEventListener("mousemove", (e) => {
+          if (isDragging) {
+            const { left, width } = controls.progress.el.getBoundingClientRect();
+            const progress = (e.clientX - left) / width;
+            const duration = player.getManifest().presentationTimeline.getSegmentAvailabilityEnd();
+            video.currentTime = progress * duration;
+            controls.progress.bar.el.style.width = `${progress * 100}%`;
+            controls.progress.handler.el.style.left = `${progress * 100}%`;
+          }
+        });
+
+        controls.progress.handler.el.addEventListener("mousedown", (e) => {
+          if (e.button === 0) {
+            isDragging = true;
+          }
+        });
+
+        // Attach player to the window to make it easy to access in the JS console.
+        window.video = video;
+        window.player = player;
+
+        // Try to load a manifest.
+        // This is an asynchronous process.
+        player.load("http://localhost:3000/live.mpd");
+      } else {
+        // This browser does not have the minimum set of APIs we need.
+        console.error("Browser not supported!");
+      }
+    </script>
+  </body>
+</html>

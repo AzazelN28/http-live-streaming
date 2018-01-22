@@ -10,9 +10,11 @@
 #define SECOND_IN_MICROSECONDS(x) ((unsigned long)x * 1000000)
 #define SECOND_IN_MILLISECONDS(x) ((unsigned long)x * 1000)
 
+#define DURATION 10
+
 static unsigned long timescale = 1000;
 
-static unsigned long start = 0;
+//static unsigned long start = 0;
 
 static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data)
 {
@@ -55,15 +57,15 @@ static gchar *on_format_location(GstElement *splitmux, guint fragment_id, gpoint
   char cwd[1024];
   if (getcwd(cwd, sizeof(cwd)) != NULL)
   {
-    unsigned long current = time(NULL);
+    /*unsigned long current = time(NULL);
     if (start == 0)
     {
       start = current;
     }
-    unsigned long delta = (current - start) > 0 ? (current - start) - 1 : 0;
-    sprintf(fragment_name, "%s/media/live_%lu.mp4", cwd, delta * timescale);
+    unsigned long delta = (current - start) > 0 ? (current - start) - 1 : 0;*/
+    sprintf(fragment_name, "%s/media/live_%lu.mp4", cwd, fragment_id * DURATION * timescale);
     g_printerr("Fragment: %s\n", fragment_name);
-    g_print("%lu\n", delta);
+    g_print("%u\n", fragment_id);
     return fragment_name;
   }
   return NULL;
@@ -89,8 +91,11 @@ int main(int argc, char **argv)
 
   pipeline = gst_pipeline_new("dash");
   source = gst_element_factory_make("videotestsrc", "source");
-  //encoder = gst_element_factory_make("x264enc", "encoder");
-  encoder = gst_element_factory_make("vtenc_h264", "encoder");
+  #ifdef __APPLE__
+    encoder = gst_element_factory_make("vtenc_h264", "encoder");
+  #elif __linux__
+    encoder = gst_element_factory_make("x264enc", "encoder");
+  #endif
   muxer = gst_element_factory_make("mp4mux", "muxer");
   muxsink = gst_element_factory_make("splitmuxsink", "muxsink");
 
@@ -102,9 +107,11 @@ int main(int argc, char **argv)
 
   g_object_set(G_OBJECT(source), "is-live", TRUE, NULL);
 
-  //g_object_set(G_OBJECT(encoder), "tune", 0x00000004, NULL);
-  //g_object_set(G_OBJECT(encoder), "speed-preset", 0x00000001, NULL);
-  //g_object_set(G_OBJECT(encoder), "bitrate", 1000, NULL);
+  #ifdef __linux__
+    g_object_set(G_OBJECT(encoder), "tune", 0x00000004, NULL);
+    g_object_set(G_OBJECT(encoder), "speed-preset", 0x00000001, NULL);
+    g_object_set(G_OBJECT(encoder), "bitrate", 1000, NULL);
+  #endif
 
   g_object_set(G_OBJECT(muxer), "faststart", TRUE, NULL);
   g_object_set(G_OBJECT(muxer), "streamable", TRUE, NULL);
@@ -115,7 +122,7 @@ int main(int argc, char **argv)
 
   //g_object_set(G_OBJECT(muxsink), "location", "media/hello_%04d.m4s", NULL);
   g_object_set(G_OBJECT(muxsink), "muxer", muxer, NULL);
-  g_object_set(G_OBJECT(muxsink), "max-size-time", SECOND_IN_NANOSECONDS(10), NULL);
+  g_object_set(G_OBJECT(muxsink), "max-size-time", SECOND_IN_NANOSECONDS(DURATION), NULL);
 
   bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
   bus_watch_id = gst_bus_add_watch(bus, bus_call, loop);

@@ -331,3 +331,11 @@ gst-launch-1.0 v4l2src ! queue ! x264enc tune=zerolatency speed-preset=ultrafast
 ```sh
 gst-launch-1.0 ximagesrc ! queue ! x264enc tune=zerolatency speed-preset=ultrafast bitrate=3600 key-int-max=100 ! splitmuxsink muxer='mp4mux faststart=true streamable=true fragment-duration=1000 trak-timescale=1000 movie-timescale=1000 presentation-time=true' max-size-time=1000000000 location=media/live_%d.mp4
 ```
+
+
+## Instrucciones con Docker
+
+make
+npm install
+docker/build.sh
+docker/run.sh

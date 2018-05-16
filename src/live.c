@@ -75,6 +75,7 @@ int main(int argc, char **argv)
 {
   GMainLoop *loop;
 
+  GstCaps *caps;
   GstElement *pipeline, *source, *encoder, *muxer, *muxsink;
   GstBus *bus;
 
@@ -89,14 +90,18 @@ int main(int argc, char **argv)
     return -1;
   }*/
 
+  caps = gst_caps_new_simple("video/x-h264",
+    "profile", G_TYPE_STRING, "main", NULL);
+
   pipeline = gst_pipeline_new("dash");
   source = gst_element_factory_make("videotestsrc", "source");
   #ifdef __APPLE__
     encoder = gst_element_factory_make("vtenc_h264", "encoder");
+    muxer = gst_element_factory_make("qtmux", "muxer");
   #elif __linux__
     encoder = gst_element_factory_make("x264enc", "encoder");
+    muxer = gst_element_factory_make("mp4mux", "muxer");
   #endif
-  muxer = gst_element_factory_make("mp4mux", "muxer");
   muxsink = gst_element_factory_make("splitmuxsink", "muxsink");
 
   if (!pipeline || !source || !encoder || !muxsink)
@@ -108,9 +113,19 @@ int main(int argc, char **argv)
   g_object_set(G_OBJECT(source), "is-live", TRUE, NULL);
 
   #ifdef __linux__
-    g_object_set(G_OBJECT(encoder), "tune", 0x00000004, NULL);
-    g_object_set(G_OBJECT(encoder), "speed-preset", 0x00000001, NULL);
-    g_object_set(G_OBJECT(encoder), "bitrate", 1000, NULL);
+    //gst_util_set_object_arg(G_OBJECT(encoder), "profile", "baseline");
+    gst_util_set_object_arg(G_OBJECT(encoder), "tune", "fastdecode");
+    //g_object_set(G_OBJECT(encoder), "tune", , NULL);
+    //gst_util_set_object_arg(G_OBJECT(encoder), "speed-preset", "ultrafast");
+    //g_object_set(G_OBJECT(encoder), "speed-preset", gst_util_set_object_arg(G_OBJECT(encoder), "speed-preset", "ultrafast"), NULL);
+    g_object_set(G_OBJECT(encoder), "bitrate", 768, NULL);
+    g_object_set(G_OBJECT(encoder), "ref", 2, NULL);
+    //g_object_set(G_OBJECT(encoder), "pass", 5, NULL);
+    //g_object_set(G_OBJECT(encoder), "quantizer", 25, NULL);
+    //g_object_set(G_OBJECT(encoder), "option-string", "--weightp 0 --me dia", NULL);
+    //g_object_set(G_OBJECT(encoder), "byte-stream", TRUE, NULL);
+    //g_object_set(G_OBJECT(encoder), "profile", 1, NULL);
+    //g_object_set(G_OBJECT(encoder), "bitrate", 768, NULL);
   #endif
 
   g_object_set(G_OBJECT(muxer), "faststart", TRUE, NULL);
@@ -130,7 +145,9 @@ int main(int argc, char **argv)
 
   gst_bin_add_many(GST_BIN(pipeline), source, encoder, muxsink, NULL);
 
-  gst_element_link_many(source, encoder, muxsink, NULL);
+  gst_element_link_many(source, encoder, NULL);
+  gst_element_link_filtered(encoder, muxsink, caps);
+  gst_caps_unref(caps);
   g_signal_connect(muxsink, "format-location", G_CALLBACK(on_format_location), NULL);
 
   g_printerr("Now recording\n");

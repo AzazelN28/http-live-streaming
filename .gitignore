@@ -240,5 +240,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+bin
+media
 
 # End of https://www.gitignore.io/api/linux,osx,windows,sublimetext,code,emacs,vim,node

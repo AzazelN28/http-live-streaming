@@ -1,40 +1,41 @@
 # DASH Live Streaming
 
-Hay varias tecnologías involucradas en la retransmisión de un directo usando DASH.
+There are multiple technologies involved in live streaming using DASH (DASH stands for Dynamic Adaptive Streaming over HTTP).
 
-1. **MSE (Media Source Extensions)**: es la parte del navegador que permite realizar streaming de vídeo componiendo un buffer a partir de chunks o segmentos independientes de vídeo. Hay muchas opciones que podemos utilizar y que nos facilitan mucho ésta tarea, ejemplos: **dash.js** o **Shaka Player**.
-2. **ISO BMFF (normalmente conocido como MPEG4), Matroska, x264, x265, vp8, vp9, Vorbis y Opus**: todas estas se pueden utilizar para generar los chunks o segmentos de vídeo que serán consumidos por el navegador pero hay formatos más compatibles que otros. Existen infinidad de herramientas que nos permiten generar este tipo de archivos: **ffmpeg**, **gstreamer**, **dashencoder**, **Shaka Packager**, **DashCast**, **MP4Box**, etc.
-3. **MPD (Media Presentation Document)**: es parte de la especificación de DASH y permite describir el contenido que vamos a consumir con MSE.
+1. **MSE (Media Source Extensions)**: this is the browser part that allows us to create an sliding window buffer from chunks of video. There are a lot of libraries that handle this part for us, for example: **dash.js** or **Shaka Player**.
+2. **ISO BMFF (usually known just as MPEG4), Matroska, x264, x265, vp8, vp9, Vorbis y Opus**: All of these codecs can be used to encode/decode the video into chunks (but there are some incompatibilities between browsers). There are a lot of tools that allows us to create these chunks using these codecs: **ffmpeg**, **gstreamer**, **dashencoder**, **Shaka Packager**, **DashCast**, **MP4Box**, etc.
+3. **MPD (Media Presentation Document)**: this part belongs to DASH and allows us to define how the chunks are, what they contain and how they can be consumed depending on network bandwidth, language or screen properties.
 
-Como se contempla en la sección 4 (página 49) de la [última especificación de DASH](http://dashif.org/wp-content/uploads/2017/09/DASH-IF-IOP-v4.1-clean.pdf) publicada hasta la fecha, existen tres posibles escenarios para la retransmisión en directo:
+As you can see in the section 4 (page 49) of the [last specification of DASH](http://dashif.org/wp-content/uploads/2017/09/DASH-IF-IOP-v4.1-clean.pdf) published to date.
+There are three possible live streaming scenearios:
 
-- **Distribución dinámica de contenido disponible**: en este caso el contenido es generado dinámicamente pero está disponible antes de comenzar la retransmisión.
-- **Emisión en directo controlada desde MPD**: en este caso se contempla que toda la información de la retransmisión está controlada por el MPD.
-- **Emisión en directo controlada desde MPD y desde los segmentos**: en este caso se contempla que toda la información de la retransmisión no sólo está controlada por el MPD si no que además se utilizarán los segmentos para extraer información relevante para la retransmisión.
+- **Dynamic Distribution of Available Content**: Services, for which content is made available as dynamic content, but the content is entirely generated prior to distribution. In this case the details of the Media Presentation, especially the Segments (duration, URLs) are known and can be announced in a single MPD without MPD updates. This addresses use cases 2 and 3 in Annex B.
+- **MPD-controlled Live Service**: Services for which the content is typically generated on the fly, and the MPD needs to be updated occasionally to reflect changes in the service offerings. For such a service, the DASH client operates solely on information in the MPD. This addresses the use cases 4 and 5 in Annex B.
+- **MPD and Segment-controlled Live**: Services for which the content is typically generated on the fly, and the MPD may need to be updated on short notice to eflect changes in the service offerings. For such a service, the DASH client operates on information in the MPD and is expected to parse segments to extract relevant information for proper operation. This addresses the use cases 4 and 5, but also takes into account the advanced use cases.
 
-Para cada uno de estos tres casos se contemplan tres posibles soluciones:
+For each of these three cases, three possible solutions are considered:
 
-- **Dynamic Segment Download**: todo el contenido se genera con antelación pero su retransmisión es considerada _live_.
-- **Simple Live Client**: el contenido es generado sobre la marcha pero sólo el **MPD** se utiliza como fuente fiable de los datos del _streaming_.
-- **Main Live Client**: el contenido es generado sobre la marcha y se utilizan tanto los datos del **MPD** como los datos contenidos en los segmentos que se van retransmitiendo durante el _streaming_. Éste es el perfil más completo y permite obtener no sólo metadatos de los segmentos como duración o tiempo actual, sino que además permite añadir eventos (Inband Events) dentro de los `mp4`.
+- **Dynamic Segment Download**: all content is generated in advance but is considered _live_.
+- **Simple Live Client**: the content is generated on the fly but only the **MPD** is used as a reliable source of the _streaming_ data.
+- **Main Live Client**: the content is generated on the fly and uses both the data from the **MPD** and the data contained in the segments that are streamed during the _streaming_. This is the most complete profile and allows to obtain not only metadata of the segments as duration or current time, but also to add events (Inband Events) within the `mp4`. This is the worst supported one.
 
-## ¿Qué es un MPD y cómo lo puedo servir?
+## ¿What is an MPD and how I can serve it?
 
-Un MPD es un archivo XML que contiene información (metadatos) sobre los segmentos de vídeo, audio y las diferentes configuraciones y opciones que podemos encontrar a la hora de reproducir el _stream_ (idiomas, subtitulos, diferentes resoluciones y formatos, etc).
+An MPD is an XML file that contains information (metadata) about the video and audio segments and the different configurations and options that can be found when playing the _stream_ (languages, subtitles, different resolutions and formats, etc).
 
-> IMPORTANTE: Para servir MPD correctamente es necesario que el servidor pueda servir los archivos `*.mpd` con el `Content-Type` como `application/dash+xml`.
+> IMPORTANT: To serve MPD correctly it is necessary that the server can serve the files `*.mpd` with the `Content-Type` as `application/dash+xml`.
 
-Para _live streaming_ el valor `type` del MPD debe ser `dynamic` (incluso cuando no se incluyen parámetros como `minimumUpdatePeriod`).
+For _live streaming_ the `type` value of the MPD must be `dynamic` (even when parameters like `minimumUpdatePeriod` are not included).
 
-> NOTA: Puede ocurrir que estemos viendo un segmento de vídeo de una cámara que no está grabando contenido nuevo, en este caso como el contenido ya está grabado y no existe un _live edge_ en vez de servir un MPD _live_ podemos servir un MPD _on-demand_ (sólo habría que cambiar los `profiles`, el `type` y eliminar el elemento `<UTCTiming>`).
+> NOTE: It may happen that we are watching a video segment of a camera that is not recording new content, in this case as the content is already recorded and there is no _live edge_ instead of serving an MPD _live_ we can serve an MPD _on-demand_ (we only need to change the `profiles`, the `type` and delete the element ``<UTCTiming>`).
 
-> NOTA: Los parámetros más importantes con respecto al `<AdaptationSet>` son `timescale`, `mimeType` y `codecs`. En mi caso he usado `mp4info` para obtener muchos de estos parámetros.
+> NOTE: The most important parameters regarding the `<AdaptationSet>` are `timescale`, `mimeType` and `codecs`. In my case I used `mp4info` to get many of these parameters.
 
-### Ejemplo
+### Example
 
 ```xml
 <MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="dynamic" profiles="urn:mpeg:dash:profile:isoff-live:2011,urn:com:dashif:dash264" publishTime="2018-01-20T03:30:28.756Z" availabilityStartTime="2018-01-20T03:17:26.269Z" minBufferTime="PT10S" suggestedPresentationDelay="PT20S">
-  <!-- Esto es muy importante a la hora de sincronizar un live streaming, se puede utilizar un endpoint propio que devuelva el timestamp actual del servidor en UTC -->
+  <!-- This is very important when synchronizing a live streaming, you can use your own endpoint to return the current server timestamp in UTC. -->
   <UTCTiming schemeIdUri="urn:mpeg:dash:utc:http-head:2014" value="https://vm2.dashif.org/dash/time.txt"/>
   <Period id="0" start="PT0S">
     <AdaptationSet id="0" mimeType="video/mp4" codecs="avc1.4D400D" segmentAlignment="true">
@@ -42,9 +43,9 @@ Para _live streaming_ el valor `type` del MPD debe ser `dynamic` (incluso cuando
       <Representation id="0" width="320" height="240" bandwidth="763333">
         <SegmentTemplate startNumber="0" media="live_$Number$.mp4"/>
         <SegmentTimeline>
-          <!-- Gracias a SegmentTimeline podemos dar más información al cliente sobre cuántos chunks hay disponibles `r`, su duración `d` y el tiempo recomendado del chunk más reciente `t` -->
+          <!-- Thanks to SegmentTimeline we can give more information to the client about how many chunks are available `r`, their duration `d` and the recommended time of the most recent `t` chunk. -->
           <S t="760000" d="5000" r="156"/>
-          <!-- Otra ventaja de utilizar SegmentTimeline es que se pueden utilizar múltiples segmentos `S` para indicar discontinuidades en el stream -->
+          <!-- Another advantage of using SegmentTimeline is that multiple `S` segments can be used to indicate stream discontinuities -->
         </SegmentTimeline>
       </Representation>
     </AdaptationSet>
@@ -52,15 +53,15 @@ Para _live streaming_ el valor `type` del MPD debe ser `dynamic` (incluso cuando
 </MPD>
 ```
 
-Para obtener algunos parámetros es posible utilizar una herramienta facilitada por el conjunto de herramientas [bento4](https://www.bento4.com/developers/dash/) llamada `mp4info`.
+To obtain some parameters it is possible to use a tool provided by the [bento4 toolkit](https://www.bento4.com/developers/dash/) called `mp4info`.
 
 ```sh
 mp4info --format json media/live_0.mp4
 ```
 
-> NOTA: No es necesario que el archivo esté completamente generado para hacer esta llamada, con que al menos las cabeceras `moov`, `mvhd`, `trak` y `moof` estén generados es suficiente. Eso sí, es totalmente necesario que sea un fragmented MP4.
+> NOTE: It is not necessary that the file is completely generated to make this call, with at least the `moov`, `mvhd`, `trak` and `moof` headers generated is sufficient. However, it must be a fragmented MP4.
 
-Usando Node.JS:
+Using Node.JS:
 
 ```js
 const cp = require("child_process");
@@ -75,8 +76,8 @@ function mp4info(filePath) {
 }
 
 mp4info(filePath).then((videoInfo) => {
-  // Destructuring utilizado para obtener las partes claves necesarias
-  // para generar el MP4.
+  // Destructuring used to obtain the necessary key parts
+  // to generate the MP4.
   const {
     tracks: [
       {
@@ -96,18 +97,15 @@ mp4info(filePath).then((videoInfo) => {
     ]
   } = videoInfo;
 
-  // Aquí tendremos las siguientes variables definidas:
+  // Here we will have the following variables defined:
   // bitrate, duration, codecsString, width, height, frameRate
 
-  // NOTA: `duration` es realmente importante porque devuelve la duración
-  // con los fragmentos y el timescale actual.
+  // NOTE: `duration` is really important because it returns the duration with the fragments and the current timescale.
 
-  // NOTA: A veces `frameRate` no está disponible porque es variable pero no hay problema
-  // siempre y cuando la duración del segmento sea la misma. Esto se puede forzar usando
-  // un GOP fijo en la codificación del h264.
+  // NOTE: Sometimes `frameRate` is not available because it is variable but no problem as long as the duration of the segment is the same. This can be forced by using a fixed GOP in the h264 coding.
 ```
 
-Este ejemplo usa como plantilla `live_$Number$.mp4`, sin embargo como se comenta en el artículo [Stop numbering: The underappreciated power of DASH's SegmentTimeline](http://www.unified-streaming.com/blog/stop-numbering-underappreciated-power-dashs-segmenttimeline) una mejor alternativa a esto es utilizar como parámetro `media` del `SegmentTemplate` una versión con el tiempo: `live_$Time$.mp4`. Sin embargo `gstreamer` no ofrece la posibilidad de imprimir el tiempo en nuestros chunks directamente desde `gst-launch-1.0` pero aún así podemos utilizar la API que nos ofrecen para hacer un programa en C que lo haga por nosotros:
+This example uses as a template `live_$Number$.mp4`, however as discussed in the article[Stop numbering: The underappreciated power of DASH's SegmentTimeline](http://www.unified-streaming.com/blog/stop-numbering-underappreciated-power-dashs-segmenttimeline) a better alternative to this is to use as an `average` parameter of the `SegmentTemplate` a version with time: `live_$Time$.mp4`. However `gstreamer` does not offer the possibility to print the time on our chunks directly from `gst-launch-1.0` but we can still use the API they offer to make a C program that does it for us:
 
 ```c
 #include <gst/gst.h>
@@ -245,89 +243,162 @@ int main(int argc, char** argv) {
 }
 ```
 
-## ¿Cómo asignar parámetros en el MPD?
+## ¿How to assign parameters to the MPD?
 
-Hay tres parámetros clave a la hora de realizar una retransmisión en directo.
+There are three key parameters for live streaming.
 
-- **minBufferTime**: Indica cuál debe ser el tamaño de buffer mínimo para que la reproducción de la emisión sea continua.
-- **suggestedPresentationDelay**: Indica cuál debe ser el desfase entre el _live edge_ y el tiempo mínimo que almacenamos en el buffer.
-- **timeShiftBufferDepth**: Indica cuál es el máximo tiempo que podemos rebobinar en una emisión en directo. IMPORTANTE: No es necesario si se van a mantener los chunks almacenados permanentemente.
+- **minBufferTime**: Indicates the minimum buffer size for continuous playback of the broadcast.
+- **suggestedPresentationDelay**: Indicates what the offset between the _live edge_ and the minimum time we store in the buffer should be.
+- **timeShiftBufferDepth**: Indicates the maximum amount of time we can rewind a live broadcast. IMPORTANT: Not necessary if chunks are to be kept permanently stored.
 
-Siempre se deben asignar de esta manera:
+They should always be assigned this way:
 
 ```
 minBufferTime < suggestedPresentationDelay < timeShiftBufferDepth
 ```
 
-Una manera de establecer el **minBufferTime** es utilizar un valor al menos dos o tres veces mayor al tiempo medio que se tarda entre que se envía una petición para descargar un chunk y el tiempo que se tarda en recibir completamente ese chunk.
+One way to set the **minBufferTime** is to use a value at least two or three times greater than the average time it takes between sending a request to download a chunk and the time it takes to fully receive that chunk.
 
 Por otra parte **suggestedPresentationDelay** siempre debería ser cómo mínimo **minBufferTime** más dos veces el tiempo medio que se tarda en **procesar** y **almacenar** un chunk.
 
-## ¿Es necesario tener un `minimumUpdatePeriod` para la retransmisión en directo?
+## Do I need to have a `minimumUpdatePeriod` for live streaming?
 
-No, `minimumUpdatePeriod` es útil para actualizar el MPD sobre la marcha en el caso de que alguno de los parámetros de los chunks o segmentos cambie. Si éstos no cambian o el _streaming_ es continuo no es necesario actualizar este documento.
+No, `minimumUpdatePeriod` is useful to update the MPD on the fly in case any of the chunks or segments parameters change. If these do not change or the _streaming_ is continuous, there is no need to update this document.
 
-## ¿Por qué no se representa correctamente el tiempo en el _live streaming_?
+## Why isn't the time displayed correctly in _live streaming_?
 
-Por defecto, cuando no se conoce la longitud de un _stream_, programas como `gstreamer` o `ffmpeg` escriben en la cabecera `mvhd` del contenedor que la duración es 0 (0x00000000) o 4294967295 (0xFFFFFFFF) para indicar que la duración es desconocida. Por lo que se indica en la documentación del W3C sobre Media Timelines, es posible que los segmentos puedan reescribir la duración de un _stream_ sobre la marcha provocando un evento `durationchange`. Sin embargo si ésto no es posible, Shaka Player posee una alternativa, podemos llamar a la función `getSegmentAvailabilityEnd` del `PresentationTimeline` del `Manifest`.
+By default, when the length of a _stream_ is not known, programs like `gstreamer` or `ffmpeg` write in the `mvhd` header of the container that the duration is 0 (0x000000000000) or 4294967295 (0xFFFFFFFFFF) to indicate that the duration is unknown. As indicated in the W3C documentation on Media Timelines, it is possible that segments may be able to rewrite the duration of a _stream_ on the fly causing a `durationchange` event. However, if this is not possible, Shaka Player has an alternative, we can call the `getSegmentAvailabilityEnd` function of `PresentationTimeline` of `Manifest`.
 
 ```js
 const player = new shaka.Player(video);
 
 player.addEventListener("streaming", () => {
-  // Aquí tenemos la primera oportunidad para obtener el manifest (y cachearlo).
   player.getManifest();
 });
 
 video.addEventListener("timeupdate", (e) => {
-  // Tiempo actual (relativo al comienzo de la reproducción).
+  // Current time (relative to the start of playback).
   videoCurrentTime = e.target.currentTime;
-  // Una manera mucho mejor de obtener el tiempo (y fecha) actual.
+  // A much better way to get the current time (and date).
   videoCurrentDate = player.getPlayheadTimeAsDate();
-  // Fecha en la que comenzó la reproducción.
+  // Date on which playback began.
   videoStartDate = player.getPresentationStartTimeAsDate();
-  // Tiempo al que podemos avanzar y retroceder.
+  // Time we can move forward and backward.
   videoSeekRange = player.seekRange();
-  // Duración de nuestro stream.
+  // Duration of our stream.
   videoDuration = player.getManifest().getPresentationTimeline().getSegmentAvailabilityEnd();
 });
 
-// Cargamos el manifest.
+// We load the manifest.
 player.load("http://localhost:4000/live.mpd");
 ```
 
-## ¿Cómo representar el tiempo disponible al que podemos saltar para nuestro _live streaming_?
+## How to represent the available time we can jump to for our _live streaming_?
 
-Shaka Player posee una función llamada `seekRange` que nos permite obtener desde qué punto a qué punto podemos realizar _seeking_ en el vídeo. Normalmente en una retransmisión en directo el campo `duration` de un elemento `<video>` es 0xFFFFFFFF o lo que es lo mismo, 4294967295. Si obtenemos este valor en la duración de un vídeo sabremos que éste es una retransmisión en directo y también sabremos que normalmente la duración de este vídeo será desde el inicio de la grabación hasta el momento actual.
+Shaka Player has a feature called `seekRange` that allows us to get from what point to what point we can perform _seeking_ in the video. Normally in a live broadcast the `duration` field of a `<video>` element is 0xFFFFFFFFFF or in other words, 4294967295. If we get this value in the duration of a video we will know that this is a live broadcast and we will also know that normally the duration of this video will be from the beginning of the recording to the present moment.
 
-## Cómo generar chunks válidos para MSE
+## Generating MSE-valid chunks
 
-Por defecto en todos estos comandos se utiliza como `speed-preset` el valor `ultrafast`, sin embargo se ha probado que hasta `medium` los vídeos generan un `codec string` válido para MSE.
+By default in all these commands the value `speed-preset` is used as `speed-preset`, however it has been proved that even `medium` videos generate a `codec string` valid for MSE. As you can see in the `x264enc` documentation for `gstreamer`, the `speed-preset` parameter can affect the `playback compatibility` (https://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-ugly-plugins/html/gst-plugins-ugly-plugins-x264enc.html#GstX264Enc--speed-preset)
 
-| Resolución | Bitrate recomendado |
+| Resolution | Recommended bitrate |
 |:----------:|:-------------------:|
 | 480p       | 1200 ~ 2000         |
 | 720p       | 2400 ~ 4000         |
 | 1080p      | 4800 ~ 8000         |
 
-> NOTA: El parámetro `max-size-time` de `mp4mux` acepta valores en nanosegundos (1/1.000.000.000 segundos).
+> NOTE: The `max-size-time` parameter of `mp4mux` accepts values in nanoseconds (1/1.000.000.000.000 seconds).
 
-> NOTA: Todos estos comandos generan _fragmented MP4s_, totalmente necesarios para garantizar una mejor reproducción en MSE.
+> NOTE: All of these commands generate _fragmented MP4s_, which are fully necessary to ensure better MSE playback.
 
-### Grabar de una fuente de pruebas
+### Recording from a test source
 
 ```sh
 gst-launch-1.0 videotestsrc is-live=true ! queue ! x264enc tune=zerolatency speed-preset=ultrafast bitrate=1000 key-int-max=100 ! splitmuxsink muxer='mp4mux faststart=true streamable=true fragment-duration=1000 trak-timescale=1000 movie-timescale=1000 presentation-time=true' max-size-time=1000000000 location=media/live_%d.mp4
 ```
 
-### Grabar de una webcam
+### Recording from a webcam (Linux)
 
 ```sh
 gst-launch-1.0 v4l2src ! queue ! x264enc tune=zerolatency speed-preset=ultrafast bitrate=2400 key-int-max=100 ! splitmuxsink muxer='mp4mux faststart=true streamable=true fragment-duration=1000 trak-timescale=1000 movie-timescale=1000 presentation-time=true' max-size-time=1000000000 location=media/live_%d.mp4
 ```
 
-### Grabar del escritorio
+### Recording from the desktop (Linux)
 
 ```sh
 gst-launch-1.0 ximagesrc ! queue ! x264enc tune=zerolatency speed-preset=ultrafast bitrate=3600 key-int-max=100 ! splitmuxsink muxer='mp4mux faststart=true streamable=true fragment-duration=1000 trak-timescale=1000 movie-timescale=1000 presentation-time=true' max-size-time=1000000000 location=media/live_%d.mp4
 ```
+
+## Problems
+
+### The MPD loads without problems, however when loading the first chunk I get a 3014 error (failed fetch and append: code=3014) What is the problem?
+
+Versions older than `1.11.1` of `mp4mux` and `gstreamer` generate erroneous `mp4` files missing the _box_ `tfdt` inside the first `traf`. As indicated in the W3C recommendation[MSE ISO BMFF Byte Stream Format] (https://www.w3.org/TR/mse-byte-stream-format-isobmff/#iso-media-segments):
+
+> The user agent must run the append error algorithm if any of the following conditions are met:
+> ...
+> 6. At least one Track Fragment Box does not contain a Track Fragment Decode Time Box (tfdt)
+> ...
+
+### When I try to play the stream I get a 3016 error
+
+This error is usually related to codecs. Some[profiles](http://blog.mediacoderhq.com/h264-profiles-and-levels/) (like _Baseline_ or _Main_) are more compatible than others, h.264 is a really complex codec that has dozens of options and settings, some players can implement only some of these features, so profiles can be more or less compatible.
+
+Try reducing the profile of _mp4_ to _Main_. With utilities like[h264bitstream](https://github.com/aizvorski/h264bitstream) you can analyze the NALUs of the h.264 stream and see what features are enabled or disabled. You can also use the PPS and SPS lines of utilities like[mp4info](https://www.bento4.com/developers/) to extract this information.
+
+## Interesting articles
+
+- [Transcoding assets for MSE](https://developer.mozilla.org/en-US/docs/Web/API/Media_Source_Extensions_API/Transcoding_assets_for_MSE)
+- [MPEG-DASH Content Generation with MP4Box and x264](https://bitmovin.com/mp4box-dash-content-generation-x264/)
+- [FFmpeg with hardware acceleration](https://trac.ffmpeg.org/wiki/HWAccelIntro)
+- [HTTP Adaptive Streaming with GStreamer](https://coaxion.net/blog/2014/05/http-adaptive-streaming-with-gstreamer/)
+- [HTML5 Live Streaming with MPEG-DASH](https://www.isrv.pw/html5-live-streaming-with-mpeg-dash)
+- [Stream live WebM video to browser using Node.js and GStreamer](https://delog.wordpress.com/2011/04/26/stream-live-webm-video-to-browser-using-node-js-and-gstreamer/)
+- [Stop numbering: The underappreciated power of DASH's SegmentTimeline](http://www.unified-streaming.com/blog/stop-numbering-underappreciated-power-dashs-segmenttimeline)
+- [The Best MPEG-DASH Open Source Players & Tools](https://bitmovin.com/mpeg-dash-open-source-player-tools/)
+- [How to encode multi-bitrate videos in MPEG-DASH for MSE based media players (1/2)](https://blog.streamroot.io/encode-multi-bitrate-videos-mpeg-dash-mse-based-media-players/)
+- [How to encode multi-bitrate videos in MPEG-DASH for MSE based media players (2/2)](https://blog.streamroot.io/encode-multi-bitrate-videos-mpeg-dash-mse-based-media-players-22/)
+- [Live DASH audio/video encoder: DashCast](https://gpac.wp.imt.fr/2013/04/23/live-dash-audiovideo-encoder-dashcast/)
+- [Example GStreamer Pipelines](http://labs.isee.biz/index.php/Example_GStreamer_Pipelines#Decode_.MP4_Files)
+- [GStreamer Basic Real Time Streaming Tutorial](http://www.einarsundgren.se/gstreamer-basic-real-time-streaming-tutorial/)
+- [Texas Instruments - Example GStreamer Pipelines](http://processors.wiki.ti.com/index.php/Example_GStreamer_Pipelines)
+- [Introduction to h264 NAL Unit](https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/)
+- [GStreamer cheatsheet](http://wiki.oz9aec.net/index.php/Gstreamer_cheat_sheet#Network_Streaming)
+- [h.264 Profiles and levels](http://blog.mediacoderhq.com/h264-profiles-and-levels/)
+- [Movie Atoms](https://developer.apple.com/library/content/documentation/QuickTime/QTFF/QTFFChap2/qtff2.html)
+
+## Useful tools
+
+- [Bento4](https://www.bento4.com/)
+- [MP4Box](https://gpac.wp.imt.fr/mp4box/)
+- [FFMPEG](https://www.ffmpeg.org/)
+- [GStreamer](https://gstreamer.freedesktop.org/)
+- [DashCast](https://gpac.wp.imt.fr/dashcast/)
+- [DASHEncoder](https://github.com/slederer/DASHEncoder)
+- [DASHencrypt](https://github.com/castlabs/dashencrypt)
+- [DASHMe](https://github.com/canalplus/DashMe)
+- [shaka-packager](https://github.com/google/shaka-packager)
+- [MPD Validator](http://www-itec.uni-klu.ac.at/dash/?page_id=605)
+- [Abrizer](https://github.com/jronallo/abrizer)
+
+## Streaming servers
+
+- [Nimble Streamer](https://es.wmspanel.com/nimble)
+- [Unified Streaming](http://www.unified-streaming.com/)
+- [Wowza Media Server](https://www.wowza.com/)
+- [Live Media Streamer](http://livemediastreamer.i2cat.net/)
+
+## Players
+
+- [shaka-player](https://github.com/google/shaka-player)
+- [dash.js](https://github.com/Dash-Industry-Forum/dash.js/wiki)
+
+## Interesting repositories
+
+- [Conformance and reference](https://raw.githubusercontent.com/Dash-Industry-Forum/Conformance-and-reference-source/)
+- [nginx RTMP module](https://github.com/arut/nginx-rtmp-module)
+- [Stream-M server](https://github.com/vbence/stream-m#fragments)
+- [C++ ISOBMFF Library](https://github.com/DigiDNA/ISOBMFF)
+- [DASHTranscoder](https://github.com/dazedsheep/DASHTranscoder)
+- [libdash](https://github.com/bitmovin/libdash)
+- [mp4parser](https://github.com/sannies/mp4parser/)

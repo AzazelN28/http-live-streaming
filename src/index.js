@@ -350,6 +350,12 @@ prepare().then(() => {
     ]
   } = videoInfo;
 
+  log("Data");
+  log(`- Codecs: ${codecsString}`);
+  log(`- Bitrate: ${bitrate}`);
+  log(`- Width: ${width}`);
+  log(`- Height: ${height}`);
+  log(`- Frame rate: ${frameRate}`);
   options.mpd.periods.push({
     id: 0,
     start: 0,
